@@ -9,6 +9,7 @@ contract Raffle is VRFConsumerBaseV2Plus{
      error NotEnoughFee();
      error RaffleNotOpen();
      error Raffle_Transferfailed();
+     error NotValid();
 
      event EnteredRaffle();
 
@@ -62,7 +63,6 @@ contract Raffle is VRFConsumerBaseV2Plus{
       function checkUpkeep(bytes memory /* checkData */ )
         public
         view
-        override
         returns (bool upkeepNeeded, bytes memory /* performData */ )
     {
         bool isOpen = RaffleState.OPEN == s_raffleState;
@@ -70,10 +70,15 @@ contract Raffle is VRFConsumerBaseV2Plus{
         bool hasPlayers = s_players.length > 0;
         bool hasBalance = address(this).balance > 0;
         upkeepNeeded = (timePassed && isOpen && hasBalance && hasPlayers);
-        return (upkeepNeeded, "0x0"); // can we comment this out?
+        return (upkeepNeeded, "0x0"); 
     }
     
-    function requestRandomWords() public {
+    function performUpkeep(bytes calldata performData) external {
+        (bool upkeepNeeded,)=checkUpkeep("");
+        if(!upkeepNeeded){
+            revert NotValid();
+        }
+
         uint requestId= s_vrfCoordinator.requestRandomWords(VRFV2PlusClient.RandomWordsRequest({
              keyHash: i_gasLane,
             subId : i_subscriptionId,
@@ -81,7 +86,6 @@ contract Raffle is VRFConsumerBaseV2Plus{
             callbackGasLimit: i_callbackGasLimit,
             numWords: numWords,
             extraArgs:  VRFV2PlusClient._argsToBytes(
-                    // Set nativePayment to true to pay for VRF requests with Sepolia ETH instead of LINK
                     VRFV2PlusClient.ExtraArgsV1({nativePayment: false})
                 )
 
